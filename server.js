@@ -79,6 +79,7 @@ app.post('/api/upload', (req, res, next) => {
     zipPath: null,
     clients: new Set(),
     result: null,
+    genogroup: req.body?.genogroup || req.query?.genogroup || '',
   };
   jobs.set(jobId, job);
 
@@ -99,7 +100,7 @@ app.post('/api/upload', (req, res, next) => {
       }
     };
 
-    const result = await runPipeline(jobDir, emit);
+    const result = await runPipeline(jobDir, emit, { genogroup: job.genogroup });
     job.zipPath = result.zipPath;
     job.result = result;
     job.status = 'done';
@@ -111,6 +112,7 @@ app.post('/api/upload', (req, res, next) => {
       downloadUrl: `/api/download/${jobId}`,
       result: {
         hasConventionNames: result.hasConventionNames,
+        genogroup: result.genogroup,
         comparison: result.comparison,
         online: result.online,
         local: result.local.map(r => ({
@@ -119,10 +121,12 @@ app.post('/api/upload', (req, res, next) => {
           noro: r.noro,
           rota: r.rota,
         })),
+        blast: result.blast,
       },
     };
     for (const client of job.clients) {
       client.write(`data: ${JSON.stringify(finalMsg)}\n\n`);
+      client.end();
     }
   } catch (err) {
     console.error(`[${jobId}] Pipeline error:`, err);
@@ -130,6 +134,7 @@ app.post('/api/upload', (req, res, next) => {
     job.message = err.message;
     for (const client of job.clients) {
       client.write(`data: ${JSON.stringify({ stage: 'error', message: err.message })}\n\n`);
+      client.end();
     }
   }
 });
@@ -153,11 +158,13 @@ app.get('/api/status/:jobId', (req, res) => {
     downloadUrl: job.status === 'done' ? `/api/download/${req.params.jobId}` : null,
     result: job.result ? {
       hasConventionNames: job.result.hasConventionNames,
+      genogroup: job.result.genogroup,
       comparison: job.result.comparison,
       online: job.result.online,
       local: job.result.local?.map(r => ({
         name: r.name, length: r.length, noro: r.noro, rota: r.rota,
       })),
+      blast: job.result.blast,
     } : null,
   })}\n\n`);
 

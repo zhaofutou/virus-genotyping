@@ -129,6 +129,17 @@
     <div class="options">
       <label><input type="checkbox" id="opt-online" checked> Online (RIVM)</label>
       <label><input type="checkbox" id="opt-local" checked> Local (reference)</label>
+      <label>
+        BLAST genogroup:
+        <select id="opt-genogroup" style="background:#192734;color:#e1e8ed;border:1px solid #38444d;padding:4px 8px;border-radius:4px;font-size:0.85rem">
+          <option value="">— skip BLAST —</option>
+          <option value="GI">GI (Norovirus)</option>
+          <option value="GII">GII (Norovirus)</option>
+          <option value="GIII">GIII</option>
+          <option value="GIV">GIV</option>
+          <option value="Rotavirus">Rotavirus A</option>
+        </select>
+      </label>
       <button class="btn" id="submit-btn" disabled>Start Typing</button>
     </div>
 
@@ -182,6 +193,8 @@
 
       const formData = new FormData();
       for (const f of selectedFiles) formData.append('files', f);
+      const genogroup = document.getElementById('opt-genogroup').value;
+      if (genogroup) formData.append('genogroup', genogroup);
 
       try {
         const resp = await fetch('/api/upload', { method: 'POST', body: formData });
@@ -255,52 +268,70 @@
       resultsEl.innerHTML = '';
       resultsEl.classList.add('active');
 
-      const { online, local, comparison, hasConventionNames } = result;
+      const { online, local, blast, comparison, hasConventionNames, genogroup } = result;
 
-      // ── Per-sequence comparison table ──
-      if (local && local.length > 0) {
-        const onlineNoroByName = {};
-        const onlineRotaByName = {};
-        if (online?.noro) for (const r of online.noro) onlineNoroByName[r['Name'] || r['name']] = r;
-        if (online?.rota) for (const r of online.rota) onlineRotaByName[r['Name'] || r['name']] = r;
+        // ── Per-sequence comparison table ──
+        if (local && local.length > 0) {
+          const onlineNoroByName = {};
+          const onlineRotaByName = {};
+          const blastByName = {};
+          if (online?.noro) for (const r of online.noro) onlineNoroByName[r['Name'] || r['name']] = r;
+          if (online?.rota) for (const r of online.rota) onlineRotaByName[r['Name'] || r['name']] = r;
+          if (blast) for (const r of blast) blastByName[r.name] = r;
 
-        let html = `
-          <div class="result-section">
-            <h2>Per-Sequence Results</h2>
-            <table class="result-table comparison-table">
-              <thead><tr>
-                <th>Sequence</th><th>Length</th>
-                <th class="online-col">Online Noro</th><th class="online-col">Online Rota</th>
-                <th class="local-col">Local Noro</th><th class="local-col">Local Rota</th>
-              </tr></thead><tbody>`;
+          const hasBlast = blast && blast.length > 0;
+          let html = `
+            <div class="result-section">
+              <h2>Per-Sequence Results${genogroup ? ` <span class="badge badge-online">BLAST: ${genogroup}</span>` : ''}</h2>
+              <table class="result-table comparison-table">
+                <thead><tr>
+                  <th>Sequence</th><th>Length</th>
+                  <th class="online-col">Online Noro</th><th class="online-col">Online Rota</th>
+                  <th class="local-col">Local Noro</th><th class="local-col">Local Rota</th>
+                  ${hasBlast ? '<th style="background:#1a2a3a;color:#4a9adb">BLAST</th>' : ''}
+                </tr></thead><tbody>`;
 
-        for (const seq of local) {
-          const no = onlineNoroByName[seq.name];
-          const ro = onlineRotaByName[seq.name];
-          html += `<tr>
-            <td><strong>${seq.name}</strong></td><td>${seq.length} bp</td>
-            <td>${no ? `${no['capsid type']||''}[${no['polymerase type']||''}]` : (online?.noroError ? '<span class="failed">error</span>' : '<span class="empty">—</span>')}</td>
-            <td>${ro ? `${ro['cluster/support_1']||''}${ro['cluster/support_2']||''}` : (online?.rotaError ? '<span class="failed">error</span>' : '<span class="empty">—</span>')}</td>
-            <td>${seq.noro.capsid||seq.noro.polymerase ? `${seq.noro.capsid||'?'}[${seq.noro.polymerase||'?'}]` : '<span class="empty">—</span>'}</td>
-            <td>${seq.rota.vp7||seq.rota.vp4 ? `${seq.rota.vp7||''}${seq.rota.vp4||''}` : '<span class="empty">—</span>'}</td>
-          </tr>`;
+          for (const seq of local) {
+            const no = onlineNoroByName[seq.name];
+            const ro = onlineRotaByName[seq.name];
+            const bl = blastByName[seq.name];
+            let blastStr = '<span class="empty">—</span>';
+            if (bl) {
+              if (bl.blast?.error) blastStr = `<span class="failed">${bl.blast.error.slice(0,40)}</span>`;
+              else {
+                const parts = [];
+                if (bl.noro?.capsid || bl.noro?.polymerase) parts.push(`${bl.noro.capsid||''}[${bl.noro.polymerase||''}]`);
+                if (bl.rota?.gType || bl.rota?.pType) parts.push(`${bl.rota.gType||''}${bl.rota.pType||''}`);
+                if (bl.blast?.topHitIdentity) parts.push(`${bl.blast.topHitIdentity}%`);
+                blastStr = parts.join(' ') || '<span class="empty">—</span>';
+              }
+            }
+
+            html += `<tr>
+              <td><strong>${seq.name}</strong></td><td>${seq.length} bp</td>
+              <td>${no ? `${no['capsid type']||''}[${no['polymerase type']||''}]` : (online?.noroError ? '<span class="failed">error</span>' : '<span class="empty">—</span>')}</td>
+              <td>${ro ? `${ro['cluster/support_1']||''}${ro['cluster/support_2']||''}` : (online?.rotaError ? '<span class="failed">error</span>' : '<span class="empty">—</span>')}</td>
+              <td>${seq.noro.capsid||seq.noro.polymerase ? `${seq.noro.capsid||'?'}[${seq.noro.polymerase||'?'}]` : '<span class="empty">—</span>'}</td>
+              <td>${seq.rota.vp7||seq.rota.vp4 ? `${seq.rota.vp7||''}${seq.rota.vp4||''}` : '<span class="empty">—</span>'}</td>
+              ${hasBlast ? `<td>${blastStr}</td>` : ''}
+            </tr>`;
+          }
+          html += `</tbody></table>
+            <a class="download-btn" href="/api/download/${currentJobId}" download>📥 Download All Results (ZIP)</a>
+            </div>`;
+          resultsEl.innerHTML = html;
         }
-        html += `</tbody></table>
-          <a class="download-btn" href="/api/download/${currentJobId}" download>📥 Download All Results (ZIP)</a>
-          </div>`;
-        resultsEl.innerHTML = html;
+
+        if (online?.noroError) resultsEl.innerHTML += `<div class="error-msg">Online Norovirus: ${online.noroError}</div>`;
+        if (online?.rotaError) resultsEl.innerHTML += `<div class="error-msg">Online Rotavirus: ${online.rotaError}</div>`;
+
+        // ── 1-72 Comparison Summary ──
+        if (hasConventionNames && comparison) {
+          resultsEl.innerHTML += renderComparison(comparison, !!blast?.length);
+        }
       }
 
-      if (online?.noroError) resultsEl.innerHTML += `<div class="error-msg">Online Norovirus: ${online.noroError}</div>`;
-      if (online?.rotaError) resultsEl.innerHTML += `<div class="error-msg">Online Rotavirus: ${online.rotaError}</div>`;
-
-      // ── 1-72 Comparison Summary ──
-      if (hasConventionNames && comparison) {
-        resultsEl.innerHTML += renderComparison(comparison);
-      }
-    }
-
-    function renderComparison(master) {
+    function renderComparison(master, hasBlast) {
       let html = `
         <div class="result-section">
           <h2>1-72 Summary Comparison</h2>
@@ -309,19 +340,21 @@
               <th>Index</th>
               <th class="local-col">Local</th>
               <th class="online-col">Online (RIVM)</th>
+              ${hasBlast ? '<th style="background:#1a2a3a;color:#4a9adb">BLAST</th>' : ''}
             </tr></thead><tbody>`;
 
       for (const item of master) {
-        if (!item.local && !item.online) continue; // skip empty rows
+        if (!item.local && !item.online && !item.blast) continue;
         const fmt = (v) => {
           if (!v) return '<span class="empty">—</span>';
-          if (v.includes('failed')) return `<span class="failed">${v}</span>`;
+          if (v.includes('failed') || v.includes('error')) return `<span class="failed">${v}</span>`;
           return v;
         };
         html += `<tr>
           <td><strong>${item.index}</strong></td>
           <td>${fmt(item.local)}</td>
           <td>${fmt(item.online)}</td>
+          ${hasBlast ? `<td>${fmt(item.blast)}</td>` : ''}
         </tr>`;
       }
 
