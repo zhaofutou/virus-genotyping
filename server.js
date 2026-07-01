@@ -111,8 +111,7 @@ app.post('/api/upload', (req, res, next) => {
       downloadUrl: `/api/download/${jobId}`,
       result: {
         hasConventionNames: result.hasConventionNames,
-        onlineSummary: result.onlineSummary,
-        localSummary: result.localSummary,
+        comparison: result.comparison,
         online: result.online,
         local: result.local.map(r => ({
           name: r.name,
@@ -154,8 +153,7 @@ app.get('/api/status/:jobId', (req, res) => {
     downloadUrl: job.status === 'done' ? `/api/download/${req.params.jobId}` : null,
     result: job.result ? {
       hasConventionNames: job.result.hasConventionNames,
-      onlineSummary: job.result.onlineSummary,
-      localSummary: job.result.localSummary,
+      comparison: job.result.comparison,
       online: job.result.online,
       local: job.result.local?.map(r => ({
         name: r.name, length: r.length, noro: r.noro, rota: r.rota,

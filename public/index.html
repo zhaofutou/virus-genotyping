@@ -255,124 +255,83 @@
       resultsEl.innerHTML = '';
       resultsEl.classList.add('active');
 
-      const { online, local, onlineSummary, localSummary, hasConventionNames } = result;
+      const { online, local, comparison, hasConventionNames } = result;
 
-      // ── Individual sequence results ──
+      // ── Per-sequence comparison table ──
       if (local && local.length > 0) {
-        // Build comparison table
+        const onlineNoroByName = {};
+        const onlineRotaByName = {};
+        if (online?.noro) for (const r of online.noro) onlineNoroByName[r['Name'] || r['name']] = r;
+        if (online?.rota) for (const r of online.rota) onlineRotaByName[r['Name'] || r['name']] = r;
+
         let html = `
           <div class="result-section">
             <h2>Per-Sequence Results</h2>
             <table class="result-table comparison-table">
-              <thead>
-                <tr>
-                  <th>Sequence</th><th>Length</th>
-                  <th class="online-col">Online Noro</th>
-                  <th class="online-col">Online Rota</th>
-                  <th class="local-col">Local Noro</th>
-                  <th class="local-col">Local Rota</th>
-                </tr>
-              </thead>
-              <tbody>`;
-
-        // Index online results by name
-        const onlineNoroByName = {};
-        const onlineRotaByName = {};
-        if (online?.noro) {
-          for (const r of online.noro) {
-            onlineNoroByName[r['Name'] || r['name']] = r;
-          }
-        }
-        if (online?.rota) {
-          for (const r of online.rota) {
-            onlineRotaByName[r['Name'] || r['name']] = r;
-          }
-        }
+              <thead><tr>
+                <th>Sequence</th><th>Length</th>
+                <th class="online-col">Online Noro</th><th class="online-col">Online Rota</th>
+                <th class="local-col">Local Noro</th><th class="local-col">Local Rota</th>
+              </tr></thead><tbody>`;
 
         for (const seq of local) {
-          const noroOnline = onlineNoroByName[seq.name];
-          const rotaOnline = onlineRotaByName[seq.name];
-
-          const noroOnlineStr = noroOnline
-            ? `${noroOnline['capsid type'] || ''}[${noroOnline['polymerase type'] || ''}]`
-            : (online?.noroError ? `<span class="failed">error</span>` : '<span class="empty">—</span>');
-          const rotaOnlineStr = rotaOnline
-            ? `${rotaOnline['cluster/support_1'] || ''}${rotaOnline['cluster/support_2'] || ''}`
-            : (online?.rotaError ? `<span class="failed">error</span>` : '<span class="empty">—</span>');
-
-          const noroLocalStr = seq.noro.capsid || seq.noro.polymerase
-            ? `${seq.noro.capsid || '?'}[${seq.noro.polymerase || '?'}]`
-            : '<span class="empty">—</span>';
-          const rotaLocalStr = seq.rota.vp7 || seq.rota.vp4
-            ? `${seq.rota.vp7 || ''}${seq.rota.vp4 || ''}`
-            : '<span class="empty">—</span>';
-
+          const no = onlineNoroByName[seq.name];
+          const ro = onlineRotaByName[seq.name];
           html += `<tr>
-            <td><strong>${seq.name}</strong></td>
-            <td>${seq.length} bp</td>
-            <td>${noroOnlineStr}</td>
-            <td>${rotaOnlineStr}</td>
-            <td>${noroLocalStr}</td>
-            <td>${rotaLocalStr}</td>
+            <td><strong>${seq.name}</strong></td><td>${seq.length} bp</td>
+            <td>${no ? `${no['capsid type']||''}[${no['polymerase type']||''}]` : (online?.noroError ? '<span class="failed">error</span>' : '<span class="empty">—</span>')}</td>
+            <td>${ro ? `${ro['cluster/support_1']||''}${ro['cluster/support_2']||''}` : (online?.rotaError ? '<span class="failed">error</span>' : '<span class="empty">—</span>')}</td>
+            <td>${seq.noro.capsid||seq.noro.polymerase ? `${seq.noro.capsid||'?'}[${seq.noro.polymerase||'?'}]` : '<span class="empty">—</span>'}</td>
+            <td>${seq.rota.vp7||seq.rota.vp4 ? `${seq.rota.vp7||''}${seq.rota.vp4||''}` : '<span class="empty">—</span>'}</td>
           </tr>`;
         }
-        html += '</tbody></table>';
-
-        // Download link
-        html += `<a class="download-btn" href="/api/download/${currentJobId}" download>📥 Download All Results (ZIP)</a>`;
-        html += '</div>';
+        html += `</tbody></table>
+          <a class="download-btn" href="/api/download/${currentJobId}" download>📥 Download All Results (ZIP)</a>
+          </div>`;
         resultsEl.innerHTML = html;
       }
 
-      // ── Online errors ──
-      if (online?.noroError) {
-        resultsEl.innerHTML += `<div class="error-msg">Online Norovirus: ${online.noroError}</div>`;
-      }
-      if (online?.rotaError) {
-        resultsEl.innerHTML += `<div class="error-msg">Online Rotavirus: ${online.rotaError}</div>`;
-      }
+      if (online?.noroError) resultsEl.innerHTML += `<div class="error-msg">Online Norovirus: ${online.noroError}</div>`;
+      if (online?.rotaError) resultsEl.innerHTML += `<div class="error-msg">Online Rotavirus: ${online.rotaError}</div>`;
 
-      // ── 1-72 Summary tables ──
-      if (hasConventionNames && (onlineSummary || localSummary)) {
-        if (onlineSummary) {
-          resultsEl.innerHTML += renderSummary('Online (RIVM)', 'online', onlineSummary);
-        }
-        if (localSummary) {
-          resultsEl.innerHTML += renderSummary('Local (Reference)', 'local', localSummary);
-        }
+      // ── 1-72 Comparison Summary ──
+      if (hasConventionNames && comparison) {
+        resultsEl.innerHTML += renderComparison(comparison);
       }
     }
 
-    function renderSummary(label, badgeClass, master) {
+    function renderComparison(master) {
       let html = `
         <div class="result-section">
-          <h2>1-72 Summary <span class="badge badge-${badgeClass}">${label}</span></h2>
-          <div class="summary-grid">`;
+          <h2>1-72 Summary Comparison</h2>
+          <table class="result-table comparison-table">
+            <thead><tr>
+              <th>Index</th>
+              <th class="local-col">Local</th>
+              <th class="online-col">Online (RIVM)</th>
+            </tr></thead><tbody>`;
 
       for (const item of master) {
-        let cls = 'no-upload';
-        let typeStr = '';
-        if (item.typing_result) {
-          if (item.typing_result === 'failed typing') {
-            cls = 'failed-typing';
-            typeStr = '✗';
-          } else {
-            cls = 'has-result';
-            typeStr = item.typing_result;
-          }
-        }
-        html += `<div class="summary-cell ${cls}" title="${item.index}: ${item.typing_result || 'no data'}">
-          <span class="idx">${item.index}</span>
-          ${typeStr ? `<span class="type">${typeStr}</span>` : ''}
-        </div>`;
+        if (!item.local && !item.online) continue; // skip empty rows
+        const fmt = (v) => {
+          if (!v) return '<span class="empty">—</span>';
+          if (v.includes('failed')) return `<span class="failed">${v}</span>`;
+          return v;
+        };
+        html += `<tr>
+          <td><strong>${item.index}</strong></td>
+          <td>${fmt(item.local)}</td>
+          <td>${fmt(item.online)}</td>
+        </tr>`;
       }
 
-      html += `</div>
+      html += `</tbody></table>
         <div class="legend">
           <div class="legend-item"><div class="legend-swatch" style="background:#1a3d2a"></div> Typed</div>
           <div class="legend-item"><div class="legend-swatch" style="background:#3d1a1a"></div> Failed</div>
           <div class="legend-item"><div class="legend-swatch" style="background:#1a1f24"></div> No data</div>
         </div>
+        <a class="download-btn" href="/api/download/${currentJobId}" download>📥 Download All Results (ZIP)</a>
       </div>`;
       return html;
     }
