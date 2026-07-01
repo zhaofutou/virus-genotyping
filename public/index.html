@@ -129,17 +129,7 @@
     <div class="options">
       <label><input type="checkbox" id="opt-online" checked> Online (RIVM)</label>
       <label><input type="checkbox" id="opt-local" checked> Local (reference)</label>
-      <label>
-        BLAST genogroup:
-        <select id="opt-genogroup" style="background:#192734;color:#e1e8ed;border:1px solid #38444d;padding:4px 8px;border-radius:4px;font-size:0.85rem">
-          <option value="">— skip BLAST —</option>
-          <option value="GI">GI (Norovirus)</option>
-          <option value="GII">GII (Norovirus)</option>
-          <option value="GIII">GIII</option>
-          <option value="GIV">GIV</option>
-          <option value="Rotavirus">Rotavirus A</option>
-        </select>
-      </label>
+      <label><input type="checkbox" id="opt-blast" checked> Local BLAST</label>
       <button class="btn" id="submit-btn" disabled>Start Typing</button>
     </div>
 
@@ -193,8 +183,8 @@
 
       const formData = new FormData();
       for (const f of selectedFiles) formData.append('files', f);
-      const genogroup = document.getElementById('opt-genogroup').value;
-      if (genogroup) formData.append('genogroup', genogroup);
+      const runBlast = document.getElementById('opt-blast').checked;
+      formData.append('runBlast', runBlast ? 'true' : 'false');
 
       try {
         const resp = await fetch('/api/upload', { method: 'POST', body: formData });
@@ -306,7 +296,14 @@
             let blastStr = '<span class="empty">—</span>';
             if (bl) {
               if (bl.blast?.error) blastStr = `<span class="failed">${bl.blast.error.slice(0,40)}</span>`;
-              else {
+              else if (bl.virus && bl.genotype) {
+                const label = bl.virus === 'norovirus' ? 'Noro' :
+                              bl.virus === 'rotavirus' ? 'Rota' :
+                              bl.virus === 'sapovirus' ? 'Sapo' :
+                              bl.virus === 'astrovirus' ? 'Astro' :
+                              bl.virus === 'adenovirus' ? 'Adeno' : bl.virus;
+                blastStr = `<strong>${label}</strong> ${bl.genotype} (${bl.blast?.topHitIdentity || '0'}%)`;
+              } else {
                 const parts = [];
                 if (bl.noro?.capsid || bl.noro?.polymerase) parts.push(`${bl.noro.capsid||''}[${bl.noro.polymerase||''}]`);
                 if (bl.rota?.gType || bl.rota?.pType) parts.push(`${bl.rota.gType||''}${bl.rota.pType||''}`);

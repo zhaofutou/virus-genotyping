@@ -79,7 +79,7 @@ app.post('/api/upload', (req, res, next) => {
     zipPath: null,
     clients: new Set(),
     result: null,
-    genogroup: req.body?.genogroup || req.query?.genogroup || '',
+    runBlast: req.body?.runBlast !== 'false' && req.query?.runBlast !== 'false',
   };
   jobs.set(jobId, job);
 
@@ -100,7 +100,7 @@ app.post('/api/upload', (req, res, next) => {
       }
     };
 
-    const result = await runPipeline(jobDir, emit, { genogroup: job.genogroup });
+    const result = await runPipeline(jobDir, emit, { runBlast: job.runBlast });
     job.zipPath = result.zipPath;
     job.result = result;
     job.status = 'done';
@@ -112,7 +112,6 @@ app.post('/api/upload', (req, res, next) => {
       downloadUrl: `/api/download/${jobId}`,
       result: {
         hasConventionNames: result.hasConventionNames,
-        genogroup: result.genogroup,
         comparison: result.comparison,
         online: result.online,
         local: result.local.map(r => ({
@@ -158,7 +157,6 @@ app.get('/api/status/:jobId', (req, res) => {
     downloadUrl: job.status === 'done' ? `/api/download/${req.params.jobId}` : null,
     result: job.result ? {
       hasConventionNames: job.result.hasConventionNames,
-      genogroup: job.result.genogroup,
       comparison: job.result.comparison,
       online: job.result.online,
       local: job.result.local?.map(r => ({
