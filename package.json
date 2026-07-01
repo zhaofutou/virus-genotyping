@@ -1,0 +1,17 @@
+{
+  "name": "virus-genotyping",
+  "version": "1.0.0",
+  "description": "Unified virus genotyping — online (RIVM) + local (reference-based) for Norovirus and Rotavirus A",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "express": "^4.21.0",
+    "multer": "^1.4.5-lts.1",
+    "playwright": "^1.52.0",
+    "uuid": "^10.0.0"
+  }
+}

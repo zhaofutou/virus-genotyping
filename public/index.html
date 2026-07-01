@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Virus Genotyping — Online + Local</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1419; color: #e1e8ed; min-height: 100vh; }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+    h1 { font-size: 1.5rem; margin-bottom: 4px; color: #fff; }
+    .subtitle { color: #8899a6; font-size: 0.85rem; margin-bottom: 24px; }
+
+    /* Upload area */
+    .upload-section {
+      border: 2px dashed #38444d; border-radius: 12px; padding: 40px; text-align: center;
+      transition: all 0.3s; cursor: pointer; margin-bottom: 24px; background: #192734;
+    }
+    .upload-section:hover, .upload-section.dragover { border-color: #1da1f2; background: #1a2f3f; }
+    .upload-icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .upload-text { color: #8899a6; font-size: 0.9rem; }
+    .upload-text strong { color: #1da1f2; }
+    #file-input { display: none; }
+    .file-list { margin-top: 12px; font-size: 0.8rem; color: #8899a6; }
+
+    /* Options */
+    .options { display: flex; gap: 12px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+    .options label { font-size: 0.85rem; color: #8899a6; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    .options input[type="checkbox"] { accent-color: #1da1f2; }
+
+    .btn {
+      background: #1da1f2; color: #fff; border: none; padding: 10px 28px; border-radius: 20px;
+      font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: background 0.2s;
+    }
+    .btn:hover { background: #1a91da; }
+    .btn:disabled { background: #38444d; cursor: not-allowed; }
+
+    /* Progress */
+    .progress { margin: 20px 0; display: none; }
+    .progress.active { display: block; }
+    .progress-bar { height: 4px; background: #38444d; border-radius: 2px; overflow: hidden; }
+    .progress-fill { height: 100%; background: #1da1f2; transition: width 0.3s; width: 0%; }
+    .progress-text { font-size: 0.8rem; color: #8899a6; margin-top: 8px; }
+
+    /* Results */
+    .results { display: none; }
+    .results.active { display: block; }
+
+    .result-section { margin-bottom: 28px; }
+    .result-section h2 {
+      font-size: 1.1rem; color: #fff; margin-bottom: 12px; padding-bottom: 8px;
+      border-bottom: 1px solid #38444d;
+    }
+    .result-section h2 .badge {
+      display: inline-block; font-size: 0.65rem; padding: 2px 8px; border-radius: 10px;
+      margin-left: 8px; font-weight: 500; vertical-align: middle;
+    }
+    .badge-online { background: #1a4d2e; color: #4adb7b; }
+    .badge-local { background: #3d2e1a; color: #dbb44a; }
+
+    /* Table */
+    .result-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .result-table th {
+      background: #192734; color: #8899a6; padding: 8px 12px; text-align: left;
+      font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;
+      border-bottom: 2px solid #38444d;
+    }
+    .result-table td {
+      padding: 8px 12px; border-bottom: 1px solid #253341; color: #e1e8ed;
+    }
+    .result-table tr:hover td { background: #192734; }
+    .result-table .failed { color: #f44; font-style: italic; }
+    .result-table .empty { color: #556677; }
+
+    /* Comparison table */
+    .comparison-table th.online-col { background: #1a2e1a; }
+    .comparison-table th.local-col { background: #2e2a1a; }
+
+    /* Summary grid */
+    .summary-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+      gap: 2px; margin-top: 12px;
+    }
+    .summary-cell {
+      text-align: center; padding: 4px 2px; border-radius: 4px; font-size: 0.55rem;
+      line-height: 1.2; min-height: 32px; display: flex; flex-direction: column;
+      justify-content: center; align-items: center; position: relative;
+    }
+    .summary-cell.has-result { background: #1a3d2a; color: #4adb7b; }
+    .summary-cell.no-upload { background: #1a1f24; color: #556677; }
+    .summary-cell.failed-typing { background: #3d1a1a; color: #f44; }
+    .summary-cell .idx { font-weight: 700; font-size: 0.65rem; }
+    .summary-cell .type { font-size: 0.5rem; opacity: 0.8; }
+
+    .legend { display: flex; gap: 16px; margin-top: 8px; font-size: 0.75rem; color: #8899a6; }
+    .legend-item { display: flex; align-items: center; gap: 4px; }
+    .legend-swatch { width: 12px; height: 12px; border-radius: 2px; }
+
+    /* Download */
+    .download-btn {
+      display: inline-flex; align-items: center; gap: 8px; margin-top: 16px;
+      background: #253341; color: #1da1f2; padding: 8px 16px; border-radius: 8px;
+      text-decoration: none; font-size: 0.85rem; border: 1px solid #38444d;
+    }
+    .download-btn:hover { background: #2a3f50; }
+
+    .error-msg { color: #f44; background: #2a1a1a; padding: 12px; border-radius: 8px; font-size: 0.85rem; margin: 12px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧬 Virus Genotyping</h1>
+    <p class="subtitle">Online (RIVM) + Local (reference-based) — Norovirus &amp; Rotavirus A</p>
+
+    <!-- Upload -->
+    <div class="upload-section" id="drop-zone">
+      <div class="upload-icon">📁</div>
+      <div class="upload-text">
+        <strong>Click or drag</strong> to upload FASTA files (.fasta, .seq, .fa) or a ZIP archive<br>
+        <span style="font-size:0.75rem">Monthly naming convention (e.g. May05V4, Jun12GII) enables 1-72 summary</span>
+      </div>
+      <input type="file" id="file-input" multiple accept=".fasta,.seq,.fa,.zip">
+      <div class="file-list" id="file-list"></div>
+    </div>
+
+    <!-- Options -->
+    <div class="options">
+      <label><input type="checkbox" id="opt-online" checked> Online (RIVM)</label>
+      <label><input type="checkbox" id="opt-local" checked> Local (reference)</label>
+      <button class="btn" id="submit-btn" disabled>Start Typing</button>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress" id="progress">
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="progress-text" id="progress-text">Starting...</div>
+    </div>
+
+    <!-- Results -->
+    <div class="results" id="results"></div>
+  </div>
+
+  <script>
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const fileList = document.getElementById('file-list');
+    const submitBtn = document.getElementById('submit-btn');
+    const progressEl = document.getElementById('progress');
+    const progressFill = document.getElementById('progress-fill');
+    const progressText = document.getElementById('progress-text');
+    const resultsEl = document.getElementById('results');
+
+    let selectedFiles = [];
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault(); dropZone.classList.remove('dragover');
+      handleFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+    function handleFiles(files) {
+      selectedFiles = [...files];
+      fileList.textContent = selectedFiles.map(f => f.name).join(', ');
+      submitBtn.disabled = selectedFiles.length === 0;
+    }
+
+    submitBtn.addEventListener('click', async () => {
+      if (selectedFiles.length === 0) return;
+
+      submitBtn.disabled = true;
+      resultsEl.innerHTML = '';
+      resultsEl.classList.remove('active');
+      progressEl.classList.add('active');
+      progressFill.style.width = '10%';
+      progressText.textContent = 'Uploading files...';
+
+      const formData = new FormData();
+      for (const f of selectedFiles) formData.append('files', f);
+
+      try {
+        const resp = await fetch('/api/upload', { method: 'POST', body: formData });
+        const { jobId, statusUrl } = await resp.json();
+
+        // SSE for progress
+        const evtSource = new EventSource(statusUrl);
+        let lastStage = '';
+
+        evtSource.onmessage = (e) => {
+          const data = JSON.parse(e.data);
+
+          if (data.stage !== lastStage) {
+            lastStage = data.stage;
+            const stageProgress = {
+              extracting: 15, concatenating: 25, typing: 40,
+              generating: 70, summarizing: 80, packaging: 90, done: 100, error: 100,
+            };
+            progressFill.style.width = (stageProgress[data.stage] || 50) + '%';
+          }
+          progressText.textContent = data.message || data.stage;
+
+          if (data.status === 'done' && data.result) {
+            evtSource.close();
+            renderResults(data.result);
+            progressEl.classList.remove('active');
+            submitBtn.disabled = false;
+          } else if (data.stage === 'error') {
+            evtSource.close();
+            progressEl.classList.remove('active');
+            resultsEl.innerHTML = `<div class="error-msg">Error: ${data.message}</div>`;
+            resultsEl.classList.add('active');
+            submitBtn.disabled = false;
+          }
+        };
+
+        evtSource.onerror = () => {
+          evtSource.close();
+          progressText.textContent = 'Connection lost. Checking status...';
+          // Fallback: poll once
+          setTimeout(async () => {
+            try {
+              const r = await fetch(`/api/status/${jobId}`);
+              const text = await r.text();
+              const lines = text.trim().split('\n');
+              const last = lines[lines.length - 1];
+              if (last.startsWith('data: ')) {
+                const data = JSON.parse(last.slice(6));
+                if (data.result) {
+                  renderResults(data.result);
+                  progressEl.classList.remove('active');
+                  submitBtn.disabled = false;
+                  return;
+                }
+              }
+            } catch {}
+            progressText.textContent = 'Failed. Please try again.';
+            submitBtn.disabled = false;
+          }, 2000);
+        };
+      } catch (err) {
+        progressEl.classList.remove('active');
+        resultsEl.innerHTML = `<div class="error-msg">Upload failed: ${err.message}</div>`;
+        resultsEl.classList.add('active');
+        submitBtn.disabled = false;
+      }
+    });
+
+    function renderResults(result) {
+      resultsEl.innerHTML = '';
+      resultsEl.classList.add('active');
+
+      const { online, local, onlineSummary, localSummary, hasConventionNames } = result;
+
+      // ── Individual sequence results ──
+      if (local && local.length > 0) {
+        // Build comparison table
+        let html = `
+          <div class="result-section">
+            <h2>Per-Sequence Results</h2>
+            <table class="result-table comparison-table">
+              <thead>
+                <tr>
+                  <th>Sequence</th><th>Length</th>
+                  <th class="online-col">Online Noro</th>
+                  <th class="online-col">Online Rota</th>
+                  <th class="local-col">Local Noro</th>
+                  <th class="local-col">Local Rota</th>
+                </tr>
+              </thead>
+              <tbody>`;
+
+        // Index online results by name
+        const onlineNoroByName = {};
+        const onlineRotaByName = {};
+        if (online?.noro) {
+          for (const r of online.noro) {
+            onlineNoroByName[r['Name'] || r['name']] = r;
+          }
+        }
+        if (online?.rota) {
+          for (const r of online.rota) {
+            onlineRotaByName[r['Name'] || r['name']] = r;
+          }
+        }
+
+        for (const seq of local) {
+          const noroOnline = onlineNoroByName[seq.name];
+          const rotaOnline = onlineRotaByName[seq.name];
+
+          const noroOnlineStr = noroOnline
+            ? `${noroOnline['capsid type'] || ''}[${noroOnline['polymerase type'] || ''}]`
+            : (online?.noroError ? `<span class="failed">error</span>` : '<span class="empty">—</span>');
+          const rotaOnlineStr = rotaOnline
+            ? `${rotaOnline['cluster/support_1'] || ''}${rotaOnline['cluster/support_2'] || ''}`
+            : (online?.rotaError ? `<span class="failed">error</span>` : '<span class="empty">—</span>');
+
+          const noroLocalStr = seq.noro.capsid || seq.noro.polymerase
+            ? `${seq.noro.capsid || '?'}[${seq.noro.polymerase || '?'}]`
+            : '<span class="empty">—</span>';
+          const rotaLocalStr = seq.rota.vp7 || seq.rota.vp4
+            ? `${seq.rota.vp7 || ''}${seq.rota.vp4 || ''}`
+            : '<span class="empty">—</span>';
+
+          html += `<tr>
+            <td><strong>${seq.name}</strong></td>
+            <td>${seq.length} bp</td>
+            <td>${noroOnlineStr}</td>
+            <td>${rotaOnlineStr}</td>
+            <td>${noroLocalStr}</td>
+            <td>${rotaLocalStr}</td>
+          </tr>`;
+        }
+        html += '</tbody></table>';
+
+        // Download link
+        html += `<a class="download-btn" href="/api/download/${location.pathname.split('/').pop() || ''}" download>📥 Download All Results (ZIP)</a>`;
+        html += '</div>';
+        resultsEl.innerHTML = html;
+      }
+
+      // ── Online errors ──
+      if (online?.noroError) {
+        resultsEl.innerHTML += `<div class="error-msg">Online Norovirus: ${online.noroError}</div>`;
+      }
+      if (online?.rotaError) {
+        resultsEl.innerHTML += `<div class="error-msg">Online Rotavirus: ${online.rotaError}</div>`;
+      }
+
+      // ── 1-72 Summary tables ──
+      if (hasConventionNames && (onlineSummary || localSummary)) {
+        if (onlineSummary) {
+          resultsEl.innerHTML += renderSummary('Online (RIVM)', 'online', onlineSummary);
+        }
+        if (localSummary) {
+          resultsEl.innerHTML += renderSummary('Local (Reference)', 'local', localSummary);
+        }
+      }
+    }
+
+    function renderSummary(label, badgeClass, master) {
+      let html = `
+        <div class="result-section">
+          <h2>1-72 Summary <span class="badge badge-${badgeClass}">${label}</span></h2>
+          <div class="summary-grid">`;
+
+      for (const item of master) {
+        let cls = 'no-upload';
+        let typeStr = '';
+        if (item.typing_result) {
+          if (item.typing_result === 'failed typing') {
+            cls = 'failed-typing';
+            typeStr = '✗';
+          } else {
+            cls = 'has-result';
+            typeStr = item.typing_result;
+          }
+        }
+        html += `<div class="summary-cell ${cls}" title="${item.index}: ${item.typing_result || 'no data'}">
+          <span class="idx">${item.index}</span>
+          ${typeStr ? `<span class="type">${typeStr}</span>` : ''}
+        </div>`;
+      }
+
+      html += `</div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-swatch" style="background:#1a3d2a"></div> Typed</div>
+          <div class="legend-item"><div class="legend-swatch" style="background:#3d1a1a"></div> Failed</div>
+          <div class="legend-item"><div class="legend-swatch" style="background:#1a1f24"></div> No data</div>
+        </div>
+      </div>`;
+      return html;
+    }
+  </script>
+</body>
+</html>
