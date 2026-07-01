@@ -153,6 +153,7 @@
     const resultsEl = document.getElementById('results');
 
     let selectedFiles = [];
+    let currentJobId = null;
 
     dropZone.addEventListener('click', () => fileInput.click());
     dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
@@ -185,6 +186,7 @@
       try {
         const resp = await fetch('/api/upload', { method: 'POST', body: formData });
         const { jobId, statusUrl } = await resp.json();
+        currentJobId = jobId;
 
         // SSE for progress
         const evtSource = new EventSource(statusUrl);
@@ -317,7 +319,7 @@
         html += '</tbody></table>';
 
         // Download link
-        html += `<a class="download-btn" href="/api/download/${location.pathname.split('/').pop() || ''}" download>📥 Download All Results (ZIP)</a>`;
+        html += `<a class="download-btn" href="/api/download/${currentJobId}" download>📥 Download All Results (ZIP)</a>`;
         html += '</div>';
         resultsEl.innerHTML = html;
       }
