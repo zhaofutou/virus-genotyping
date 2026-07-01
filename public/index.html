@@ -270,19 +270,27 @@
 
       const { online, local, blast, comparison, hasConventionNames, genogroup } = result;
 
+        const findOnlineResult = (seqName, onlineList) => {
+          if (!onlineList) return null;
+          const match = onlineList.find(r => (r['Name'] || r['name'] || '') === seqName);
+          if (match) return match;
+          
+          const cleanSeqName = seqName.replace(/[^a-zA-Z0-9]/g, '');
+          return onlineList.find(r => {
+            const rName = (r['Name'] || r['name'] || '').replace(/[^a-zA-Z0-9]/g, '');
+            return rName && (cleanSeqName.startsWith(rName) || rName.startsWith(cleanSeqName));
+          }) || null;
+        };
+
         // ── Per-sequence comparison table ──
         if (local && local.length > 0) {
-          const onlineNoroByName = {};
-          const onlineRotaByName = {};
           const blastByName = {};
-          if (online?.noro) for (const r of online.noro) onlineNoroByName[r['Name'] || r['name']] = r;
-          if (online?.rota) for (const r of online.rota) onlineRotaByName[r['Name'] || r['name']] = r;
           if (blast) for (const r of blast) blastByName[r.name] = r;
 
           const hasBlast = blast && blast.length > 0;
           let html = `
             <div class="result-section">
-              <h2>Per-Sequence Results${genogroup ? ` <span class="badge badge-online">BLAST: ${genogroup}</span>` : ''}</h2>
+              <h2>Per-Sequence Results</h2>
               <table class="result-table comparison-table">
                 <thead><tr>
                   <th>Sequence</th><th>Length</th>
@@ -292,8 +300,8 @@
                 </tr></thead><tbody>`;
 
           for (const seq of local) {
-            const no = onlineNoroByName[seq.name];
-            const ro = onlineRotaByName[seq.name];
+            const no = findOnlineResult(seq.name, online?.noro);
+            const ro = findOnlineResult(seq.name, online?.rota);
             const bl = blastByName[seq.name];
             let blastStr = '<span class="empty">—</span>';
             if (bl) {
@@ -309,8 +317,8 @@
 
             html += `<tr>
               <td><strong>${seq.name}</strong></td><td>${seq.length} bp</td>
-              <td>${no ? `${no['capsid type']||''}[${no['polymerase type']||''}]` : (online?.noroError ? '<span class="failed">error</span>' : '<span class="empty">—</span>')}</td>
-              <td>${ro ? `${ro['cluster/support_1']||''}${ro['cluster/support_2']||''}` : (online?.rotaError ? '<span class="failed">error</span>' : '<span class="empty">—</span>')}</td>
+              <td>${no ? `${no['capsid type'] || no['capsid_1'] || '?'}[${no['polymerase type'] || no['polymerase_1'] || '?'}]` : (online?.noroError ? '<span class="failed">error</span>' : '<span class="empty">—</span>')}</td>
+              <td>${ro ? `${ro['cluster result'] || ro['cluster/support_1'] || ro['cluster/support type'] || ''}${ro['cluster support'] || ro['cluster/support_2'] || ro['cluster/support subtype'] || ''}` : (online?.rotaError ? '<span class="failed">error</span>' : '<span class="empty">—</span>')}</td>
               <td>${seq.noro.capsid||seq.noro.polymerase ? `${seq.noro.capsid||'?'}[${seq.noro.polymerase||'?'}]` : '<span class="empty">—</span>'}</td>
               <td>${seq.rota.vp7||seq.rota.vp4 ? `${seq.rota.vp7||''}${seq.rota.vp4||''}` : '<span class="empty">—</span>'}</td>
               ${hasBlast ? `<td>${blastStr}</td>` : ''}
